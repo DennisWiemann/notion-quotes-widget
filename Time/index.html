@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Clock</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ========================================
+           CSS Variables & Configuration
+           ======================================== */
+        :root {
+            --font-family: 'Roboto', sans-serif;
+            --time-size: 4rem;
+            --date-size: 1.5rem;
+            
+            /* Light Theme */
+            --light-text: rgba(0, 0, 0, 0.9);
+            --light-bg: #ffffff;
+            
+            /* Dark Theme */
+            --dark-text: rgba(255, 255, 255, 0.9);
+            --dark-bg: rgb(25, 25, 25);
+        }
+
+        /* ========================================
+           Base Styles
+           ======================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-family);
+        }
+
+        /* ========================================
+           Clock Styles
+           ======================================== */
+        .clock {
+            text-align: center;
+            user-select: none;
+        }
+
+        .clock__time {
+            font-size: var(--time-size);
+            font-weight: 300;
+            line-height: 1.2;
+            letter-spacing: 0.05em;
+        }
+
+        .clock__date {
+            font-size: var(--date-size);
+            font-weight: 400;
+            margin-top: 0.5rem;
+            opacity: 0.8;
+        }
+
+        /* ========================================
+           Theme Modes
+           ======================================== */
+        .theme--light {
+            color: var(--light-text);
+            background-color: var(--light-bg);
+        }
+
+        .theme--dark {
+            color: var(--dark-text);
+            background-color: var(--dark-bg);
+        }
+    </style>
+</head>
+
+<body class="theme--dark">
+    <main class="clock">
+        <div class="clock__time">00:00:00</div>
+        <div class="clock__date">Lädt...</div>
+    </main>
+
+    <script>
+        /**
+         * Minimal Clock Widget
+         * Displays current time (24h) and date in German
+         */
+        (function() {
+            'use strict';
+
+            /* ========================================
+               Configuration
+               ======================================== */
+            const CONFIG = {
+                updateInterval: 1000, // Update every second
+                locale: 'de-DE',
+                selectors: {
+                    body: 'body',
+                    time: '.clock__time',
+                    date: '.clock__date'
+                }
+            };
+
+            /* ========================================
+               Date/Time Formatter Module
+               ======================================== */
+            const DateTimeFormatter = {
+                formatTime(date) {
+                    return date.toLocaleTimeString(CONFIG.locale, {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                },
+
+                formatDate(date) {
+                    const day = date.getDate();
+                    const month = date.toLocaleDateString(CONFIG.locale, { month: 'long' });
+                    const year = date.getFullYear();
+                    
+                    return `${day}. ${month} ${year}`;
+                }
+            };
+
+            /* ========================================
+               Theme Manager Module
+               ======================================== */
+            const ThemeManager = {
+                elements: null,
+
+                init(elements) {
+                    this.elements = elements;
+                    this.applySystemTheme();
+                    this.setupSystemThemeListener();
+                },
+
+                getSystemTheme() {
+                    return window.matchMedia('(prefers-color-scheme: dark)').matches 
+                        ? 'dark' 
+                        : 'light';
+                },
+
+                applyTheme(theme) {
+                    this.elements.body.className = `theme--${theme}`;
+                },
+
+                applySystemTheme() {
+                    const theme = this.getSystemTheme();
+                    this.applyTheme(theme);
+                },
+
+                setupSystemThemeListener() {
+                    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                    mediaQuery.addEventListener('change', (e) => {
+                        this.applyTheme(e.matches ? 'dark' : 'light');
+                    });
+                }
+            };
+
+            /* ========================================
+               Clock Controller Module
+               ======================================== */
+            const ClockController = {
+                elements: null,
+                intervalId: null,
+
+                init() {
+                    this.cacheElements();
+                    ThemeManager.init(this.elements);
+                    this.startClock();
+                },
+
+                cacheElements() {
+                    this.elements = {
+                        body: document.querySelector(CONFIG.selectors.body),
+                        timeElement: document.querySelector(CONFIG.selectors.time),
+                        dateElement: document.querySelector(CONFIG.selectors.date)
+                    };
+                },
+
+                updateClock() {
+                    const now = new Date();
+                    
+                    this.elements.timeElement.textContent = DateTimeFormatter.formatTime(now);
+                    this.elements.dateElement.textContent = DateTimeFormatter.formatDate(now);
+                },
+
+                startClock() {
+                    this.updateClock(); // Initial update
+                    this.intervalId = setInterval(() => this.updateClock(), CONFIG.updateInterval);
+                },
+
+                stopClock() {
+                    if (this.intervalId) {
+                        clearInterval(this.intervalId);
+                        this.intervalId = null;
+                    }
+                }
+            };
+
+            /* ========================================
+               Application Bootstrap
+               ======================================== */
+            function init() {
+                ClockController.init();
+            }
+
+            // Start application when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', () => {
+                ClockController.stopClock();
+            });
+        })();
+    </script>
+</body>
+</html>
