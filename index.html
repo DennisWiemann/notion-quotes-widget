@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Random Quote</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400&family=Roboto+Mono:wght@300;400&family=Roboto:wght@300;400&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ========================================
+           CSS Variables & Configuration
+           ======================================== */
+        :root {
+            --default-font-size: 1.5rem;
+            --transition-speed: 0.2s;
+            --max-card-width: 700px;
+            --card-width: 80%;
+            
+            /* Light Theme */
+            --light-text: rgba(0, 0, 0, 0.9);
+            --light-bg: #ffffff;
+            
+            /* Dark Theme */
+            --dark-text: rgba(255, 255, 255, 0.9);
+            --dark-bg: rgb(25, 25, 25);
+        }
+
+        /* ========================================
+           Base Styles
+           ======================================== */
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ========================================
+           Quote Card Styles
+           ======================================== */
+        .card {
+            width: var(--card-width);
+            max-width: var(--max-card-width);
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .quote {
+            font-size: var(--default-font-size);
+        }
+
+        .quote__content {
+            font-weight: 200;
+        }
+
+        .quote__dash {
+            opacity: 0.2;
+        }
+
+        .quote__author {
+            font-size: 80%;
+            font-weight: 500;
+            font-style: normal;
+        }
+
+        /* ========================================
+           Typography - Font Families
+           ======================================== */
+        .font--mono { font-family: 'Roboto Mono', monospace; }
+        .font--sans { font-family: 'Roboto', sans-serif; }
+        .font--serif { font-family: 'Noto Serif JP', serif; }
+
+        /* ========================================
+           Theme Modes
+           ======================================== */
+        .theme--light {
+            color: var(--light-text);
+            background-color: var(--light-bg) !important;
+        }
+
+        .theme--dark {
+            color: var(--dark-text);
+            background-color: var(--dark-bg) !important;
+        }
+
+        /* ========================================
+           Settings Panel
+           ======================================== */
+        .settings {
+            text-align: center;
+            background-color: #eee;
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            opacity: 0;
+            transition: opacity var(--transition-speed);
+        }
+
+        .settings:hover {
+            opacity: 1;
+        }
+
+        .settings__divider {
+            border: none;
+            border-bottom: 1px solid gray;
+            opacity: 0.2;
+            padding: 0;
+            margin: 0;
+            margin-bottom: 0.4rem;
+        }
+
+        /* Settings Buttons */
+        .settings button {
+            border: none;
+            background: none;
+            text-transform: capitalize;
+            cursor: pointer;
+            transition: opacity var(--transition-speed);
+        }
+
+        .settings button:hover {
+            opacity: 0.6;
+        }
+
+        .settings__action { padding: 0.4rem; }
+        .settings__modes button { font-size: 0.8rem; }
+        .settings__size button { font-size: 1rem; }
+        
+        .settings__fonts button {
+            font-size: 1.2rem;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .settings__fonts small {
+            font-size: 0.8rem;
+            float: left;
+        }
+    </style>
+</head>
+
+<body class="theme--dark">
+    <!-- ========================================
+         Settings Panel
+         ======================================== -->
+    <aside class="settings" aria-label="Display Settings">
+        <div class="settings__action font--sans">
+            <button data-action="shuffle">Shuffle</button>
+        </div>
+        <hr class="settings__divider">
+        <div class="settings__size font--sans">
+            <button data-size="increase">A+</button>
+            <button data-size="decrease">A-</button>
+        </div>
+        <div class="settings__modes font--sans">
+            <button data-theme="light">Light</button>
+            <button data-theme="dark">Dark</button>
+        </div>
+        <div class="settings__fonts">
+            <button data-font="sans">ag<br><small class="font--sans">Default</small></button>
+            <button data-font="serif">ag<br><small class="font--sans">Serif</small></button>
+            <button data-font="mono">ag<br><small class="font--sans">Mono</small></button>
+        </div>
+    </aside>
+
+    <!-- ========================================
+         Quote Display
+         ======================================== -->
+    <main class="quote font--sans">
+        <div class="card-body">
+            <blockquote>
+                <p class="quote__content"></p>
+                <span class="quote__dash">―</span>
+                <cite class="quote__author"></cite>
+            </blockquote>
+        </div>
+    </main>
+
+    <script>
+        /**
+         * Quote Widget Application
+         * Modular architecture for displaying random quotes with customizable appearance
+         */
+        (function() {
+            'use strict';
+
+            /* ========================================
+               Configuration
+               ======================================== */
+            const CONFIG = {
+                quotesFile: 'quotes.json',
+                storage: {
+                    keys: {
+                        font: 'quote_font',
+                        theme: 'quote_theme',
+                        size: 'quote_size'
+                    }
+                },
+                defaults: {
+                    font: 'sans',
+                    theme: 'dark',
+                    size: 1.5,
+                    sizeStep: 0.1
+                },
+                selectors: {
+                    body: 'body',
+                    quote: '.quote',
+                    quoteContent: '.quote__content',
+                    quoteAuthor: '.quote__author',
+                    btnShuffle: '[data-action="shuffle"]',
+                    btnSize: '[data-size]',
+                    btnFont: '[data-font]',
+                    btnTheme: '[data-theme]'
+                }
+            };
+
+            /* ========================================
+               Storage Module
+               ======================================== */
+            const Storage = {
+                get(key, defaultValue = null) {
+                    const value = localStorage.getItem(key);
+                    return value !== null ? value : defaultValue;
+                },
+
+                set(key, value) {
+                    localStorage.setItem(key, value);
+                },
+
+                getNumber(key, defaultValue = 0) {
+                    const value = this.get(key);
+                    return value !== null ? parseFloat(value) : defaultValue;
+                }
+            };
+
+            /* ========================================
+               Quote Service Module
+               ======================================== */
+            const QuoteService = {
+                quotes: [],
+
+                async loadQuotes() {
+                    if (this.quotes.length > 0) return;
+                    
+                    const response = await fetch(CONFIG.quotesFile);
+                    if (!response.ok) throw new Error('Failed to load quotes.json');
+                    
+                    this.quotes = await response.json();
+                    
+                    if (!Array.isArray(this.quotes) || this.quotes.length === 0) {
+                        throw new Error('Invalid quotes data');
+                    }
+                },
+
+                getRandomQuote() {
+                    const randomIndex = Math.floor(Math.random() * this.quotes.length);
+                    return this.quotes[randomIndex];
+                },
+
+                async loadQuote() {
+                    await this.loadQuotes();
+                    return this.getRandomQuote();
+                }
+            };
+
+            /* ========================================
+               Theme Manager Module
+               ======================================== */
+            const ThemeManager = {
+                elements: null,
+
+                init(elements) {
+                    this.elements = elements;
+                    this.setupSystemThemeListener();
+                },
+
+                setTheme(theme) {
+                    this.elements.body.className = `theme--${theme}`;
+                    Storage.set(CONFIG.storage.keys.theme, theme);
+                },
+
+                getSystemTheme() {
+                    return window.matchMedia('(prefers-color-scheme: dark)').matches 
+                        ? 'dark' 
+                        : 'light';
+                },
+
+                setupSystemThemeListener() {
+                    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                    
+                    mediaQuery.addEventListener('change', (e) => {
+                        if (!Storage.get(CONFIG.storage.keys.theme)) {
+                            this.setTheme(e.matches ? 'dark' : 'light');
+                        }
+                    });
+                },
+
+                restore() {
+                    const savedTheme = Storage.get(CONFIG.storage.keys.theme);
+                    const theme = savedTheme || this.getSystemTheme();
+                    this.elements.body.className = `theme--${theme}`;
+                }
+            };
+
+            /* ========================================
+               Typography Manager Module
+               ======================================== */
+            const TypographyManager = {
+                elements: null,
+                currentSize: CONFIG.defaults.size,
+
+                init(elements) {
+                    this.elements = elements;
+                },
+
+                setFont(font) {
+                    this.elements.quote.className = `quote font--${font}`;
+                    Storage.set(CONFIG.storage.keys.font, font);
+                },
+
+                setSize(size) {
+                    this.currentSize = size;
+                    this.elements.quote.style.fontSize = `${size}rem`;
+                    Storage.set(CONFIG.storage.keys.size, size);
+                },
+
+                adjustSize(direction) {
+                    const delta = direction === 'increase' 
+                        ? CONFIG.defaults.sizeStep 
+                        : -CONFIG.defaults.sizeStep;
+                    
+                    const newSize = parseFloat((this.currentSize + delta).toFixed(2));
+                    this.setSize(newSize);
+                },
+
+                restore() {
+                    const font = Storage.get(CONFIG.storage.keys.font, CONFIG.defaults.font);
+                    this.setFont(font);
+
+                    const size = Storage.getNumber(CONFIG.storage.keys.size, CONFIG.defaults.size);
+                    this.setSize(size);
+                }
+            };
+
+            /* ========================================
+               UI Controller Module
+               ======================================== */
+            const UIController = {
+                elements: null,
+
+                init() {
+                    this.cacheElements();
+                    this.bindEvents();
+                    
+                    ThemeManager.init(this.elements);
+                    TypographyManager.init(this.elements);
+                },
+
+                cacheElements() {
+                    this.elements = {
+                        body: document.querySelector(CONFIG.selectors.body),
+                        quote: document.querySelector(CONFIG.selectors.quote),
+                        quoteContent: document.querySelector(CONFIG.selectors.quoteContent),
+                        quoteAuthor: document.querySelector(CONFIG.selectors.quoteAuthor),
+                        btnShuffle: document.querySelector(CONFIG.selectors.btnShuffle),
+                        btnsSize: document.querySelectorAll(CONFIG.selectors.btnSize),
+                        btnsFont: document.querySelectorAll(CONFIG.selectors.btnFont),
+                        btnsTheme: document.querySelectorAll(CONFIG.selectors.btnTheme)
+                    };
+                },
+
+                bindEvents() {
+                    // Shuffle button
+                    this.elements.btnShuffle.addEventListener('click', () => this.loadAndDisplayQuote());
+
+                    // Size buttons
+                    this.elements.btnsSize.forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            TypographyManager.adjustSize(btn.dataset.size);
+                        });
+                    });
+
+                    // Font buttons
+                    this.elements.btnsFont.forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            TypographyManager.setFont(btn.dataset.font);
+                        });
+                    });
+
+                    // Theme buttons
+                    this.elements.btnsTheme.forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            ThemeManager.setTheme(btn.dataset.theme);
+                        });
+                    });
+                },
+
+                async loadAndDisplayQuote() {
+                    try {
+                        const quote = await QuoteService.loadQuote();
+                        this.displayQuote(quote);
+                    } catch (error) {
+                        console.error('Failed to load quote:', error);
+                        this.displayError();
+                    }
+                },
+
+                displayQuote({ content, author }) {
+                    this.elements.quoteContent.textContent = content;
+                    this.elements.quoteAuthor.textContent = author;
+                },
+
+                displayError() {
+                    this.elements.quoteContent.textContent = 'Oops! There is a problem loading the quote.';
+                    this.elements.quoteAuthor.textContent = '';
+                },
+
+                restoreSettings() {
+                    ThemeManager.restore();
+                    TypographyManager.restore();
+                }
+            };
+
+            /* ========================================
+               Application Bootstrap
+               ======================================== */
+            function init() {
+                UIController.init();
+                UIController.restoreSettings();
+                UIController.loadAndDisplayQuote();
+            }
+
+            // Start application when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })();
+    </script>
+</body>
+</html>
